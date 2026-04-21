@@ -1,0 +1,124 @@
+scan:
+  name: Scan for unused entities
+  description: >
+    Scans the Home Assistant instance for unused entities, automations,
+    scripts, and helpers. Results are saved to storage and fired as
+    the ha_optimizer_scan_complete event.
+  fields: {}
+
+purge:
+  name: Purge selected entities
+  description: >
+    Purges (disables or permanently deletes) the specified entities.
+    With soft_delete=true (default), entities are disabled and moved to
+    the trash — fully reversible via the restore service.
+    With soft_delete=false, entities are permanently deleted.
+  fields:
+    entity_ids:
+      name: Entity IDs
+      description: List of entity_ids to purge.
+      required: true
+      selector:
+        entity:
+          multiple: true
+    soft_delete:
+      name: Soft delete
+      description: >
+        If true (default), entities are disabled and tracked in trash
+        (can be restored with the restore service).
+        If false, entities are permanently and irreversibly deleted.
+      required: false
+      default: true
+      selector:
+        boolean:
+
+restore:
+  name: Restore soft-deleted entity
+  description: >
+    Re-enables a previously soft-deleted (disabled) entity and removes
+    it from the trash. The entity will resume normal operation.
+  fields:
+    entity_id:
+      name: Entity ID
+      description: The entity_id to restore from trash.
+      required: true
+      selector:
+        entity:
+
+get_results:
+  name: Get last scan results
+  description: >
+    Returns the last scan results as a service response, including the
+    current trash (soft-deleted entities). Use in automations or scripts
+    to process results programmatically.
+  fields: {}
+
+analyze_recorder:
+  name: Analyze Recorder DB
+  description: >
+    Queries the recorder database to identify top-writing entities,
+    wasteful records (many writes, few distinct states), domain
+    statistics, and generates a YAML snippet for recorder optimizations.
+  fields: {}
+
+analyze_dashboard:
+  name: Analyze Dashboard
+  description: >
+    Reads Lovelace dashboard config from .storage/lovelace* to detect
+    heavy cards, overloaded views, missing or unavailable entities,
+    duplicate entity references, uninstalled custom cards, Jinja2
+    template cards, WebSocket push pressure, and recorder cross-ref
+    waste. Supports all default and named dashboards.
+  fields: {}
+
+analyze_storms:
+  name: Detect State Storms
+  description: >
+    Finds entities that are updating their state abnormally fast
+    compared to their domain baseline. High-frequency writers cause
+    database bloat, increased CPU usage, and browser performance issues.
+    Results include severity, ratio vs baseline, and fix suggestions.
+  fields: {}
+
+analyze_dead_code:
+  name: Analyze Automation Dead Code
+  description: >
+    Scans all UI-created automations for broken triggers, actions, and
+    conditions that reference entities, devices, or services that no
+    longer exist. Helps identify automations that will silently fail.
+  fields: {}
+
+analyze_health:
+  name: Check Integration Health
+  description: >
+    Analyzes integration health by examining unavailability and reconnect
+    patterns over the last 7 days. Identifies devices with weak batteries,
+    poor signal, or abnormal disconnection rates and scores each integration.
+  fields: {}
+
+analyze_fingerprint:
+  name: Analyze Fingerprint
+  description: >
+    Compares today's HA system behaviour against its own historical baseline
+    (up to 30 days). Detects anomalies in state writes, automation trigger
+    count, unavailability events, and HA lifecycle events using statistical
+    methods (σ or IQR). Does not compare against other users — only against
+    your own past behaviour.
+  fields: {}
+
+collect_baseline:
+  name: Collect Baseline
+  description: >
+    Captures a snapshot of yesterday's system metrics and saves it to the
+    fingerprint baseline store. Normally runs automatically at 00:05 each day.
+    Call manually on first install or when you want to collect data immediately
+    without waiting for the scheduled run.
+  fields: {}
+
+analyze_addons:
+  name: Analyze Add-ons
+  description: >
+    Queries the Supervisor API to return host resource usage (CPU, RAM, disk, OS)
+    and the full add-on list with per-addon state, version, update availability,
+    and runtime stats (CPU %, RAM). Only available on Home Assistant OS / Supervised.
+  fields: {}

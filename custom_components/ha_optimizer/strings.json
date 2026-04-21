@@ -1,0 +1,119 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "HA Optimizer Setup",
+        "description": "Configure the Optimizer. It will scan your Home Assistant instance for unused entities, automations, scripts and helpers.",
+        "data": {
+          "scan_interval_days": "Auto-scan interval (days, 0 = disabled)",
+          "stale_days_threshold": "Days without state change to consider stale",
+          "enable_soft_delete": "Enable Soft Delete (disable before hard delete)",
+          "soft_delete_days": "Days in soft-delete before permanent removal",
+          "exclude_device_classes": "Device classes to always exclude (comma-separated)"
+        },
+        "data_description": {
+          "scan_interval_days": "Set to 0 to disable automatic scanning. Recommended: 7 days.",
+          "stale_days_threshold": "Entities with no state change for this many days will be flagged. Recommended: 30 days.",
+          "enable_soft_delete": "When enabled, entities are disabled (reversible) before being permanently deleted.",
+          "soft_delete_days": "After this many days in the trash, entities are permanently deleted automatically.",
+          "exclude_device_classes": "Comma-separated list of device classes that will NEVER be suggested for deletion (e.g. smoke,motion,door)."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to Home Assistant internals",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "HA Optimizer is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "HA Optimizer Options",
+        "description": "Adjust settings for HA Optimizer. Changes take effect immediately after saving.",
+        "data": {
+          "scan_interval_days": "Auto-scan interval (days, 0 = disabled)",
+          "stale_days_threshold": "Days without state change to consider stale",
+          "enable_soft_delete": "Enable Soft Delete (disable before hard delete)",
+          "soft_delete_days": "Days in soft-delete before permanent removal",
+          "exclude_device_classes": "Device classes to always exclude (comma-separated)"
+        },
+        "data_description": {
+          "scan_interval_days": "Set to 0 to disable automatic scanning. Recommended: 7 days.",
+          "stale_days_threshold": "Entities with no state change for this many days will be flagged. Recommended: 30 days.",
+          "enable_soft_delete": "When enabled, entities are disabled (reversible) before being permanently deleted.",
+          "soft_delete_days": "After this many days in the trash, entities are permanently deleted automatically.",
+          "exclude_device_classes": "Comma-separated list of device classes that will NEVER be suggested for deletion (e.g. smoke,motion,door)."
+        }
+      }
+    }
+  },
+  "services": {
+    "scan": {
+      "name": "Scan for unused entities",
+      "description": "Scans the Home Assistant instance for unused entities, automations, scripts, and helpers. Results are saved and fired as an event."
+    },
+    "purge": {
+      "name": "Purge selected entities",
+      "description": "Purges (disables or deletes) the specified entities. Use soft_delete=true to disable (reversible), soft_delete=false to permanently delete.",
+      "fields": {
+        "entity_ids": {
+          "name": "Entity IDs",
+          "description": "List of entity_ids to purge."
+        },
+        "soft_delete": {
+          "name": "Soft delete",
+          "description": "If true (default), entities are disabled and moved to trash (can be restored). If false, entities are permanently deleted."
+        }
+      }
+    },
+    "restore": {
+      "name": "Restore soft-deleted entity",
+      "description": "Re-enables a previously soft-deleted (disabled) entity and removes it from the trash.",
+      "fields": {
+        "entity_id": {
+          "name": "Entity ID",
+          "description": "The entity_id to restore."
+        }
+      }
+    },
+    "get_results": {
+      "name": "Get last scan results",
+      "description": "Returns the last scan results as a service response, including trash (soft-deleted) entities."
+    },
+    "analyze_fingerprint": {
+      "name": "Analyze Fingerprint",
+      "description": "Compares today's HA behaviour against its own historical baseline — detects anomalies in state writes, automation triggers, and integration reconnects."
+    },
+    "collect_baseline": {
+      "name": "Collect Baseline",
+      "description": "Captures yesterday's metrics snapshot and saves it to the baseline store. Normally runs automatically at 00:05 each day. Call manually on first install."
+    },
+    "analyze_recorder": {
+      "name": "Analyze Recorder DB",
+      "description": "Queries the recorder database to find top-writing entities, wasteful records, and suggests recorder YAML optimizations."
+    },
+    "analyze_dashboard": {
+      "name": "Analyze Dashboard",
+      "description": "Reads Lovelace dashboard config from .storage to detect heavy cards, missing entities, and other performance issues."
+    },
+    "analyze_storms": {
+      "name": "Detect State Storms",
+      "description": "Finds entities that are updating their state abnormally fast, causing database bloat and browser performance issues."
+    },
+    "analyze_dead_code": {
+      "name": "Analyze Automation Dead Code",
+      "description": "Scans automations for broken triggers, actions, or conditions that reference entities that no longer exist."
+    },
+    "analyze_health": {
+      "name": "Check Integration Health",
+      "description": "Scores integration health based on reconnect frequency, battery levels, and unavailability patterns over the last 7 days."
+    },
+    "analyze_addons": {
+      "name": "Analyze Add-ons",
+      "description": "Queries the Supervisor API to return host resource usage (CPU, RAM, disk, OS) and the full add-on list with per-addon state, version, update status, and runtime stats."
+    }
+  }
+}
