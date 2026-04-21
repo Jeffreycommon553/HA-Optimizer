@@ -1547,7 +1547,7 @@ window.addEventListener('load', async () => {
   _updateConnStatus();
   await loadLastResults();
   _restoreAllTabCaches();
-  _fetchSysBarOnly(); // load sysbar in background
+  _startSysbarLoop(); // load sysbar + keep refreshing every 10s on all tabs
 });
 
 // (Token management removed — authentication handled by HA hass object)
@@ -2237,12 +2237,13 @@ function updateSoftDeleteCount(delta) {
 // SOFT DELETE TAB
 // ================================================================
 function switchTab(name) {
-  // Stop addon realtime when leaving
+  // Pause sysbar realtime when leaving addon tab, resume when entering
   if (name !== 'addon' && _addonRealtimeOn) {
     _addonRealtimeOn = false;
     if (_addonRealtimeTimer) { clearTimeout(_addonRealtimeTimer); _addonRealtimeTimer = null; }
-    const btn = document.getElementById('btnAddonRealtime');
-    if (btn) { btn.innerHTML = '⏱ Auto'; btn.style.borderColor = ''; }
+  }
+  if (name === 'addon' && !_addonRealtimeOn) {
+    _addonRealtimeOn = true; // re-arm before loadAddonTab calls _addonRealtimeTick
   }
   ['scan','recorder','dashboard','storms','deadcode','health','fingerprint','addon','soft'].forEach(t => {
     const el = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
@@ -8528,7 +8529,10 @@ function _patchAddonStats(addons) {
 }
 
 // ── Full load ────────────────────────────────────────────────────
-// Fetch only sysbar data (used on page load for all tabs)
+// ── Sysbar global realtime loop (always runs, all tabs) ──────────
+let _sysbarTimer = null;
+const SYSBAR_INTERVAL = 10000; // refresh every 10 s
+
 async function _fetchSysBarOnly() {
   try {
     const raw  = await callService('ha_optimizer', 'analyze_addons', {});
@@ -8536,13 +8540,31 @@ async function _fetchSysBarOnly() {
     if (data && !data.error) {
       _lastAddonData = data;
       _renderSysBar(data.host || {});
+      // Update clock on sysbar
       const ts = document.getElementById('addonLastRefresh');
       if (ts) ts.textContent = '🕐 ' + new Date().toLocaleTimeString();
+      // If we're also on the addon tab, patch live addon rows too
+      const addonTabVisible = document.getElementById('tabAddon') &&
+        document.getElementById('tabAddon').style.display !== 'none';
+      if (addonTabVisible) _patchAddonStats(data.addons || []);
     }
   } catch(e) {
-    // Silently fail on non-addon tabs — just log
     console.debug('[SysBar] fetch failed:', e.message);
   }
+}
+
+// Start the always-on sysbar loop (called once at page load)
+function _startSysbarLoop() {
+  const _tick = async () => {
+    // Skip if addon tab is active — its own 5s realtime loop handles updates
+    const addonTabVisible = document.getElementById('tabAddon') &&
+      document.getElementById('tabAddon').style.display !== 'none';
+    if (!addonTabVisible) {
+      await _fetchSysBarOnly();
+    }
+    _sysbarTimer = setTimeout(_tick, SYSBAR_INTERVAL);
+  };
+  _tick(); // fire immediately on load regardless of tab
 }
 
 async function loadAddonTab() {
