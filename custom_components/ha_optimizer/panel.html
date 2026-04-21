@@ -340,14 +340,7 @@
       font-size: 0.78rem;
       flex-shrink: 0;
     }
-    #tokenDropdownWrap button {
-      padding: 6px 10px !important;
-      font-size: 0.78rem !important;
-    }
-    /* Donate button: shorter label on mobile */
-    .btn-donate .donate-text { display: none; }
-    .btn-donate .donate-icon { display: inline; }
-    #tokenDropdownMenu { right: 0; left: auto; min-width: 260px; max-width: 92vw; }
+
     .main { padding: 12px 10px; }
     .tabs { gap: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
     .tab { padding: 8px 12px; font-size: 0.8rem; white-space: nowrap; flex-shrink: 0; }
@@ -928,41 +921,10 @@
   <a class="btn-donate" href="https://www.paypal.com/paypalme/doanlong1412" target="_blank" rel="noopener" id="btnDonate">
     ☕ <span data-i18n="donate">Ủng hộ</span>
   </a>
-  <!-- TOKEN DROPDOWN -->
-  <div style="position:relative; flex-shrink:0" id="tokenDropdownWrap">
-    <button onclick="toggleTokenMenu()" id="tokenDropdownBtn"
-      style="padding:7px 12px; background:var(--surface2); border:1px solid var(--border);
-             border-radius:8px; cursor:pointer; color:var(--text-muted); font-size:0.8rem;
-             white-space:nowrap; display:flex; align-items:center; gap:6px; transition:all 0.15s"
-      onmouseover="this.style.borderColor='var(--primary)'"
-      onmouseout="this.style.borderColor='var(--border)'">
-      🔑 Token <span id="tokenStatusDot" style="width:7px;height:7px;border-radius:50%;background:var(--text-muted);display:inline-block;flex-shrink:0"></span>
-      <span style="font-size:0.7rem;opacity:0.6">▾</span>
-    </button>
-    <div id="tokenDropdownMenu" style="display:none; position:absolute; top:calc(100% + 8px); right:0;
-         background:var(--surface); border:1px solid var(--border); border-radius:12px;
-         box-shadow:var(--shadow); padding:14px; z-index:500; min-width:280px; flex-direction:column; gap:10px">
-      <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em">🔑 Long-Lived Access Token</div>
-      <div id="tokenCurrentDisplay" style="font-size:0.78rem; color:var(--text-muted); padding:6px 10px; background:var(--surface2); border-radius:6px; word-break:break-all; min-height:28px" data-i18n-default="tokenNoToken">
-              </div>
-      <textarea id="tokenInput" placeholder="Paste token here…&#10;Settings → Profile → Long-Lived Access Tokens"
-        style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border);
-               background:var(--surface2); color:var(--text); font-size:0.8rem; font-family:monospace;
-               resize:vertical; min-height:64px; outline:none; box-sizing:border-box; line-height:1.4"
-        onfocus="this.style.borderColor='var(--primary)'"
-        onblur="this.style.borderColor='var(--border)'"></textarea>
-      <div style="display:flex; gap:8px">
-        <button onclick="saveTokenFromInput()" class="btn btn-primary" style="flex:1; padding:7px 12px; font-size:0.82rem; justify-content:center" id="btnSaveTokenUI">
-          💾 <span data-i18n="btnSaveToken">Lưu token</span>
-        </button>
-        <button onclick="clearTokenAndReload()" class="btn btn-ghost" style="padding:7px 12px; font-size:0.82rem; color:var(--danger); border-color:rgba(244,67,54,0.3)" id="btnDeleteTokenUI">
-          🗑️ <span data-i18n="btnDeleteToken">Xóa</span>
-        </button>
-      </div>
-      <div style="font-size:0.72rem; color:var(--text-muted); line-height:1.5; border-top:1px solid var(--border); padding-top:8px" id="tokenHintDiv" data-i18n="tokenHint">
-        <span data-i18n="tokenHint">Token stored in localStorage.</span>
-      </div>
-    </div>
+  <!-- CONNECTION STATUS (replaces token dropdown) -->
+  <div id="connStatusWrap" style="display:flex;align-items:center;gap:6px;padding:7px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:0.8rem;color:var(--text-muted)">
+    <span id="connStatusDot" style="width:7px;height:7px;border-radius:50%;background:var(--text-muted);display:inline-block;flex-shrink:0"></span>
+    <span id="connStatusTxt">Đang kết nối…</span>
   </div>
   </div><!-- end topbar-controls -->
 </div>
@@ -1229,7 +1191,7 @@
             <th onclick="sortBy('category')" data-i18n="thCategory">Loại</th>
             <th onclick="sortBy('risk_level')" data-i18n="thRisk">Mức độ rủi ro</th>
             <th data-i18n="thReason">${t("thReason")}</th>
-            <th onclick="sortBy('last_changed')" data-i18n="thLastChanged">Lần thay đổi cuối</th>
+            <th onclick="sortBy('last_changed')" data-i18n="thLastChanged" title="Hover vào giá trị để xem ngày giờ đầy đủ">Lần thay đổi cuối ↕</th>
             <th data-i18n="thUsedIn">Sử dụng trong</th>
             <th data-i18n="thSource">Nguồn</th>
           </tr>
@@ -1409,159 +1371,144 @@ let sortAsc = true;
 let currentPage = 1;
 const PAGE_SIZE = 50;
 let hardDeleteMode = false;
-let haToken = null;
 
 // ================================================================
-// HA API — Token & Auth
+// HA API — WebSocket via hass object (no token required)
 // ================================================================
-const TOKEN_KEY = 'ha_optimizer_token_v2';
 
-// Persistent storage: localStorage survives app restarts, sessionStorage is session-only.
-// We try localStorage first (persistent), fallback to sessionStorage (mobile restrictions).
-function _saveToken(t) {
-  try { localStorage.setItem(TOKEN_KEY, t); return; } catch(e) {}
-  try { sessionStorage.setItem(TOKEN_KEY, t); } catch(e) {}
-}
-function _loadToken() {
-  try { const t = localStorage.getItem(TOKEN_KEY); if (t) return t; } catch(e) {}
-  try { const t = sessionStorage.getItem(TOKEN_KEY); if (t) return t; } catch(e) {}
-  return null;
-}
-function _clearToken() {
-  try { localStorage.removeItem(TOKEN_KEY); } catch(e) {}
-  try { sessionStorage.removeItem(TOKEN_KEY); } catch(e) {}
-}
-
-// Validate a token by calling /api/ — returns true if 200/OK
-async function _validateToken(t) {
-  if (!t || t === '__NO_TOKEN__') return false;
-  try {
-    const res = await fetch('/api/', {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${t}` },
-    });
-    return res.ok; // 200 = valid, 401 = expired/invalid
-  } catch(e) { return false; }
-}
-
-async function getToken() {
-  // 1. Already have valid token in memory
-  if (haToken) return haToken;
-
-  // 2. Try persistent storage (survives app restart / closing)
-  const stored = _loadToken();
-  if (stored && stored !== '__NO_TOKEN__') {
-    // Quick validation — if still valid, use it immediately (no prompt needed)
-    const valid = await _validateToken(stored);
-    if (valid) {
-      haToken = stored;
-      return haToken;
-    } else {
-      // Token expired — clear it so we don't keep trying
-      console.debug('[PurgeEngine] Stored token expired, clearing...');
-      _clearToken();
-    }
-  }
-
-  // 3. Read hassTokens from localStorage (desktop browser / same-origin iframe)
-  try {
-    const src = [window.localStorage, window.parent?.localStorage];
-    for (const ls of src) {
-      if (!ls) continue;
-      const raw = ls.getItem('hassTokens');
-      if (!raw) continue;
-      const parsed = JSON.parse(raw);
-      for (const entry of Object.values(parsed)) {
-        const t = entry?.access_token || entry?.token;
-        if (t && typeof t === 'string' && t.length > 20) {
-          haToken = t;
-          _saveToken(haToken);
-          return haToken;
-        }
-      }
-    }
-  } catch(e) { console.debug('hassTokens read failed:', e); }
-
-  // 4. Try hassConnection on parent window (same-origin iframe)
-  try {
-    const conn = window.parent?.hassConnection;
-    if (conn) {
-      const t = conn.options?.auth?.data?.access_token
-             || conn.options?.auth?.accessToken
-             || conn.auth?.data?.access_token;
-      if (t) { haToken = t; _saveToken(haToken); return haToken; }
-    }
-  } catch(e) {}
-
-  // 5. Try supervisor / hass user token globals
-  try {
-    const t = window.__supervisorToken
-           || window.parent?.__supervisorToken
-           || window.__HASS_USER_TOKEN__;
-    if (t) { haToken = t; _saveToken(haToken); return haToken; }
-  } catch(e) {}
-
-  // 6. Try meta tag injected by HA
-  try {
-    const meta = document.querySelector('meta[name="access-token"]');
-    if (meta?.content) { haToken = meta.content; _saveToken(haToken); return haToken; }
-  } catch(e) {}
-
-  // 7. Trusted / ingress mode — no token needed
-  try {
-    const testRes = await fetch('/api/', { method: 'GET' });
-    if (testRes.ok) { haToken = '__NO_TOKEN__'; return haToken; }
-  } catch(e) {}
-
-  // 8. Manual input — Long-Lived Access Token (saved persistently so user never has to enter again)
-  const manual = prompt(t('tokenPromptMsg'));
-  if (manual && manual.trim()) {
-    const tk = manual.trim();
-    const valid = await _validateToken(tk);
-    if (!valid) {
-      _clearToken();
-      throw new Error(t('tokenInvalidMsg'));
-    }
-    haToken = tk;
-    _saveToken(haToken);
-    return haToken;
-  }
-  throw new Error(t('tokenNoAuthMsg'));
-}
-
-async function haApi(endpoint, method = 'POST', body = null) {
-  const token = await getToken();
-  const headers = { 'Content-Type': 'application/json' };
-  if (token && token !== '__NO_TOKEN__') {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  const res = await fetch(`/api/${endpoint}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : null,
-  });
-  if (res.status === 401) {
-    // Token invalid — clear and retry once with fresh token
-    haToken = null;
-    try { sessionStorage.removeItem(TOKEN_KEY); } catch(e) {}
-    return haApi(endpoint, method, body);
-  }
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
-  }
-  return res.json();
-}
-
-// Services that support response (declared with SupportsResponse in __init__.py)
+// Services that return structured response data
 const SERVICES_WITH_RESPONSE = new Set(['scan', 'get_results', 'analyze_recorder', 'analyze_dashboard', 'analyze_storms', 'analyze_dead_code', 'analyze_health', 'analyze_addons', 'analyze_fingerprint', 'collect_baseline']);
 
+/**
+ * Get the `hass` object injected by HA into the parent iframe context.
+ * This object contains an authenticated WebSocket connection — no token needed.
+ *
+ * Priority:
+ *  1. window.parent.document.querySelector('home-assistant').hass  (standard HA iframe panel)
+ *  2. window.parent.hass                                            (some HA versions)
+ *  3. window.hass                                                   (direct embed)
+ */
+function _getHass() {
+  // 1. Standard HA iframe panel: home-assistant custom element in parent
+  try {
+    const ha = window.parent?.document?.querySelector('home-assistant');
+    if (ha?.hass) return ha.hass;
+  } catch(e) {}
+  // 2. Some HA versions expose hass directly on parent window
+  try { if (window.parent?.hass) return window.parent.hass; } catch(e) {}
+  // 3. Direct embed (no iframe)
+  try { if (window.hass) return window.hass; } catch(e) {}
+  // 4. home-assistant-main element
+  try {
+    const main = window.parent?.document?.querySelector('home-assistant-main');
+    if (main?.hass) return main.hass;
+  } catch(e) {}
+  // 5. ha-panel-iframe (HA injects hass onto the panel element itself)
+  try {
+    const panel = window.parent?.document?.querySelector('ha-panel-iframe');
+    if (panel?.hass) return panel.hass;
+  } catch(e) {}
+  return null;
+}
+
+/**
+ * Call an HA service. Strategy (in order):
+ *  1. WebSocket sendMessagePromise with return_response  (HA 2023.7+, most reliable)
+ *  2. WebSocket hass.callService fallback                (older HA frontend)
+ *  3. REST /api/ with hass auth token                   (extracted from connection)
+ *  4. REST /api/ without token                          (ingress / trusted network)
+ */
 async function callService(domain, service, data = {}) {
   const withResponse = SERVICES_WITH_RESPONSE.has(service);
+  const hass = _getHass();
+
+  // ── Path 1: WebSocket via connection.sendMessagePromise (most reliable for return_response) ──
+  const conn = hass?.connection;
+  if (conn?.sendMessagePromise) {
+    try {
+      const msg = {
+        type: 'call_service',
+        domain,
+        service,
+        service_data: data,
+        ...(withResponse ? { return_response: true } : {}),
+      };
+      const result = await conn.sendMessagePromise(msg);
+      // result shape: { context: {...}, response: {...} }  (HA 2023.7+)
+      if (withResponse) {
+        const resp = result?.response ?? result?.service_response ?? result;
+        return { service_response: resp ?? {} };
+      }
+      return {};
+    } catch(wsErr) {
+      console.warn('[HAOptimizer] WS sendMessagePromise failed:', wsErr.message ?? wsErr);
+    }
+  }
+
+  // ── Path 2: hass.callService fallback ──
+  if (hass?.callService) {
+    try {
+      if (!withResponse) {
+        await hass.callService(domain, service, data);
+        return {};
+      }
+      // For return_response try the 6-arg signature (HA 2023.7+)
+      const result = await hass.callService(domain, service, data, undefined, false, true);
+      return { service_response: result ?? {} };
+    } catch(wsErr2) {
+      console.warn('[HAOptimizer] hass.callService fallback failed:', wsErr2.message ?? wsErr2);
+    }
+  }
+
+  // ── Path 3 & 4: REST /api/ — try with token first, then without ──
   const endpoint = withResponse
     ? `services/${domain}/${service}?return_response`
     : `services/${domain}/${service}`;
-  return haApi(endpoint, 'POST', data);
+  const url = `/api/${endpoint}`;
+  const body = JSON.stringify(data);
+
+  // Extract token from hass connection auth if available
+  const authToken = hass?.auth?.data?.access_token
+    ?? hass?.connection?.options?.auth?.data?.access_token
+    ?? null;
+
+  for (const headers of [
+    authToken
+      ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` }
+      : null,
+    { 'Content-Type': 'application/json' },
+  ]) {
+    if (!headers) continue;
+    try {
+      const res = await fetch(url, { method: 'POST', headers, body });
+      if (res.status === 401) continue; // try next
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+      }
+      return res.json();
+    } catch(e) {
+      if (e.message.startsWith('HTTP')) throw e;
+      // network error — try next
+    }
+  }
+
+  throw new Error('Không thể kết nối HA. Panel phải được mở trong sidebar của HA.');
+}
+
+// ── Connection status indicator ──
+function _updateConnStatus() {
+  const dot = document.getElementById('connStatusDot');
+  const txt = document.getElementById('connStatusTxt');
+  if (!dot || !txt) return;
+  const hass = _getHass();
+  if (hass) {
+    dot.style.background = 'var(--success)';
+    txt.textContent = '✅ Đã kết nối HA';
+  } else {
+    dot.style.background = 'var(--warning)';
+    txt.textContent = '⚠️ Trusted / Ingress mode';
+  }
 }
 
 /**
@@ -1590,91 +1537,20 @@ function extractData(raw) {
 // INIT
 // ================================================================
 window.addEventListener('load', async () => {
-  _refreshTokenDisplay(); // show status dot immediately
-  const stored = _loadToken();
-  if (stored && stored !== '__NO_TOKEN__') {
-    haToken = stored;
-    toast('info', '🔗 ' + t('tokenSavedMsg'));
-    await loadLastResults();
-    _restoreAllTabCaches();
-    _fetchSysBarOnly(); // load sysbar in background
-    return;
+  // Debug: log hass connection state to console
+  const hass = _getHass();
+  if (hass) {
+    console.info('[HAOptimizer] ✅ hass object found. connection:', !!hass.connection, 'sendMessagePromise:', !!hass.connection?.sendMessagePromise);
+  } else {
+    console.warn('[HAOptimizer] ⚠️ hass object NOT found — will try REST fallback');
   }
-
-  try {
-    await getToken();
-    if (haToken === '__NO_TOKEN__') {
-      toast('info', '🔗 Trusted mode');
-    } else {
-      toast('info', '🔗 ' + t('tokenSavedMsg'));
-    }
-  } catch(e) {
-    toast('error', `⚠️ ${e.message}`);
-  }
-  _refreshTokenDisplay();
+  _updateConnStatus();
   await loadLastResults();
   _restoreAllTabCaches();
   _fetchSysBarOnly(); // load sysbar in background
 });
 
-// ── Token dropdown ──
-function toggleTokenMenu() {
-  const menu = document.getElementById('tokenDropdownMenu');
-  const isOpen = menu.style.display === 'flex';
-  menu.style.display = isOpen ? 'none' : 'flex';
-  if (!isOpen) _refreshTokenDisplay();
-}
-
-document.addEventListener('click', e => {
-  const wrap = document.getElementById('tokenDropdownWrap');
-  if (wrap && !wrap.contains(e.target)) {
-    document.getElementById('tokenDropdownMenu').style.display = 'none';
-  }
-});
-
-function _refreshTokenDisplay() {
-  const stored = _loadToken();
-  const el = document.getElementById('tokenCurrentDisplay');
-  const dot = document.getElementById('tokenStatusDot');
-  if (stored && stored !== '__NO_TOKEN__') {
-    const masked = stored.slice(0, 8) + '••••••••••••' + stored.slice(-6);
-    if (el) el.textContent = '✅ ' + masked;
-    if (dot) dot.style.background = 'var(--success)';
-  } else if (stored === '__NO_TOKEN__') {
-    if (el) el.textContent = '✅ Trusted mode';
-    if (dot) dot.style.background = 'var(--success)';
-  } else {
-    if (el) el.textContent = '⚠️ ' + t('tokenNoToken');
-    if (dot) dot.style.background = 'var(--warning)';
-  }
-}
-
-async function saveTokenFromInput() {
-  const inp = document.getElementById('tokenInput');
-  const t = inp?.value?.trim();
-  if (!t) { toast('error', '❌ Token empty'); return; }
-  toast('info', t('analyzing'));
-  const valid = await _validateToken(t);
-  if (!valid) {
-    toast('error', t('tokenInvalidMsg'));
-    return;
-  }
-  haToken = t;
-  _saveToken(t);
-  if (inp) inp.value = '';
-  _refreshTokenDisplay();
-  document.getElementById('tokenDropdownMenu').style.display = 'none';
-  toast('success', t('tokenSavedMsg'));
-}
-
-function clearTokenAndReload() {
-  haToken = null;
-  _clearToken();
-  _refreshTokenDisplay();
-  document.getElementById('tokenDropdownMenu').style.display = 'none';
-  toast('info', t('tokenClearedMsg'));
-  setTimeout(() => location.reload(), 1200);
-}
+// (Token management removed — authentication handled by HA hass object)
 
 async function loadLastResults() {
   const cached = localStorage.getItem('ha_optimizer_results');
@@ -2069,6 +1945,34 @@ function _navBtn(onclickExpr, title) {
 }
 
 /**
+ * Format an ISO timestamp as a human-readable age string.
+ * Inspired by Orphan Entity Cleaner's age_hours display — always shows
+ * a concrete number so the user never sees "No data yet" when data exists.
+ *
+ * Returns HTML string (may include a tooltip with the full date).
+ */
+function formatAge(isoStr) {
+  if (!isoStr) return `<span style="color:var(--text-muted);font-size:0.78rem">—</span>`;
+  const date = new Date(isoStr);
+  if (isNaN(date.getTime())) return `<span style="color:var(--text-muted);font-size:0.78rem">—</span>`;
+
+  const diffMs   = Date.now() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHrs  = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  let label;
+  if (diffMins < 60)        label = `${diffMins}m ago`;
+  else if (diffHrs < 24)    label = `${diffHrs}h ago`;
+  else if (diffDays < 30)   label = `${diffDays}d ago`;
+  else if (diffDays < 365)  label = `${Math.floor(diffDays / 30)}mo ago`;
+  else                      label = `${Math.floor(diffDays / 365)}y ago`;
+
+  const fullDate = date.toLocaleString();
+  return `<span title="${fullDate}" style="cursor:default; white-space:nowrap">${label}</span>`;
+}
+
+/**
  * Build clickable used_in list with links to automations/scripts/yaml files
  */
 function buildUsedInLinks(usedIn) {
@@ -2136,7 +2040,7 @@ function renderTable() {
     const riskClass = `risk-${r.risk_level}`;
     const riskLabel = r.risk_level === 'low' ? `🟢 ${t('filterLow').replace('🟢 ','')}` : r.risk_level === 'medium' ? `🟡 ${t('filterMedium').replace('🟡 ','')}` : `🔴 ${t('filterHigh').replace('🔴 ','')}`;
     const catLabel = { entity: '⚡ Entity', helper: '🔧 Helper', automation: '🤖 Auto', script: '📜 Script' }[r.category] || r.category;
-    const lastChanged = r.last_changed ? new Date(r.last_changed).toLocaleDateString() : t('noData');
+    const lastChanged = formatAge(r.last_changed);
 
     // Build clickable "used_in" links
     const usedInHtml = buildUsedInLinks(r.used_in);
@@ -3745,11 +3649,6 @@ const I18N = {
     btnCancel: '✕ Bỏ chọn',
     btnRestore: '♻️ Khôi phục',
     btnHardDelete: '❌ Xóa vĩnh viễn',
-    btnSaveToken: '💾 Lưu token',
-    btnDeleteToken: '🗑️ Xóa',
-    tokenPlaceholder: 'Dán token mới vào đây…\nSettings → Profile → Long-Lived Access Tokens',
-    tokenNoToken: 'Chưa có token',
-    tokenHint: 'Token được lưu vào localStorage — chỉ cần nhập 1 lần duy nhất.\nDùng "Xóa" nếu token hết hạn hoặc muốn đổi tài khoản.',
     searchPlaceholder: '🔍 Tìm theo tên hoặc entity_id…',
     filterAll: 'Tất cả rủi ro',
     filterLow: '🟢 Thấp',
@@ -3829,11 +3728,6 @@ const I18N = {
     softRestoreBtn: '♻️ Khôi phục',
     softHardDelBtn: '❌ Xóa vĩnh viễn',
     impactNote: '⚡ Phân tích tác động:',
-    tokenSavedMsg: '✅ Token đã được lưu!',
-    tokenClearedMsg: '🗑️ Token đã xóa.',
-    tokenInvalidMsg: 'Token không hợp lệ. Vui lòng tạo token mới trong Settings → Profile.',
-    tokenNoAuthMsg: 'Không có token xác thực. Vui lòng tạo Long-Lived Access Token trong Settings → Profile.',
-    tokenPromptMsg: '📱 Nhập Long-Lived Access Token để kết nối HA.\nToken này sẽ được lưu vĩnh viễn — chỉ cần nhập 1 lần duy nhất.\n\nCách tạo: Settings → Profile → cuộn xuống\n"Long-Lived Access Tokens" → Tạo token mới\n\nDán token vào đây:',
     // Gauge
     gaugeGood: 'Tốt', gaugeAvg: 'Trung bình', gaugePoor: 'Cần xử lý',
     gaugeNeedReview: 'entity cần xem xét', gaugeClean: 'Hệ thống sạch ✨',
@@ -4130,11 +4024,6 @@ const I18N = {
     btnCancel: '✕ Deselect',
     btnRestore: '♻️ Restore',
     btnHardDelete: '❌ Hard Delete',
-    btnSaveToken: '💾 Save Token',
-    btnDeleteToken: '🗑️ Clear',
-    tokenPlaceholder: 'Paste new token here…\nSettings → Profile → Long-Lived Access Tokens',
-    tokenNoToken: 'No token set',
-    tokenHint: 'Token is stored in localStorage — only enter once.\nUse "Clear" if the token expires or you want to switch accounts.',
     searchPlaceholder: '🔍 Search by name or entity_id…',
     filterAll: 'All risks',
     filterLow: '🟢 Low',
@@ -4214,11 +4103,6 @@ const I18N = {
     softRestoreBtn: '♻️ Restore',
     softHardDelBtn: '❌ Hard Delete',
     impactNote: '⚡ Impact Analysis:',
-    tokenSavedMsg: '✅ Token saved!',
-    tokenClearedMsg: '🗑️ Token cleared.',
-    tokenInvalidMsg: 'Token is invalid. Please create a new token in Settings → Profile.',
-    tokenNoAuthMsg: 'No authentication token. Please create a Long-Lived Access Token in Settings → Profile.',
-    tokenPromptMsg: '📱 Enter your Long-Lived Access Token to connect to HA.\nThis token will be stored permanently — only enter it once.\n\nHow to create: Settings → Profile → scroll down\n"Long-Lived Access Tokens" → Create Token\n\nPaste your token here:',
     gaugeGood: 'Good', gaugeAvg: 'Average', gaugePoor: 'Needs Attention',
     gaugeNeedReview: 'entities to review', gaugeClean: 'System is clean ✨',
     modalHardDeleteTitle: '❌ Confirm Hard Delete', modalSoftDeleteTitle: '🗑️ Disable Entities',
@@ -4504,11 +4388,6 @@ const I18N = {
     btnCancel: '✕ Abwählen',
     btnRestore: '♻️ Wiederherstellen',
     btnHardDelete: '❌ Endgültig löschen',
-    btnSaveToken: '💾 Token speichern',
-    btnDeleteToken: '🗑️ Löschen',
-    tokenPlaceholder: 'Neuen Token hier einfügen…\nEinstellungen → Profil → Langzeit-Zugriffstoken',
-    tokenNoToken: 'Kein Token gesetzt',
-    tokenHint: 'Token wird in localStorage gespeichert — nur einmal eingeben.\n"Löschen" verwenden wenn Token abläuft.',
     searchPlaceholder: '🔍 Nach Name oder entity_id suchen…',
     filterAll: 'Alle Risiken',
     filterLow: '🟢 Niedrig',
@@ -4598,11 +4477,6 @@ const I18N = {
     softRestoreBtn: '♻️ Wiederherstellen',
     softHardDelBtn: '❌ Endgültig löschen',
     impactNote: '⚡ Auswirkungsanalyse:',
-    tokenSavedMsg: '✅ Token gespeichert!',
-    tokenClearedMsg: '🗑️ Token gelöscht.',
-    tokenInvalidMsg: 'Token ungültig. Bitte neuen Token in Einstellungen → Profil erstellen.',
-    tokenNoAuthMsg: 'Kein Authentifizierungstoken. Bitte Langzeit-Zugriffstoken in Einstellungen → Profil erstellen.',
-    tokenPromptMsg: '📱 Langzeit-Zugriffstoken eingeben.\nWird dauerhaft gespeichert — nur einmal eingeben.\n\nErstellen: Einstellungen → Profil → nach unten scrollen\n"Langzeit-Zugriffstoken" → Neuen Token erstellen\n\nToken hier einfügen:',
 
     // Health
     healthAnalyzingConn: 'Verbindungsverlauf wird analysiert...',
@@ -4864,11 +4738,6 @@ const I18N = {
     btnCancel: '✕ Désélectionner',
     btnRestore: '♻️ Restaurer',
     btnHardDelete: '❌ Supprimer définitivement',
-    btnSaveToken: '💾 Enregistrer le token',
-    btnDeleteToken: '🗑️ Effacer',
-    tokenPlaceholder: 'Collez le nouveau token ici…\nParamètres → Profil → Tokens d\'accès longue durée',
-    tokenNoToken: 'Aucun token défini',
-    tokenHint: 'Le token est stocké dans localStorage — à saisir une seule fois.\nUtilisez "Effacer" si le token expire.',
     searchPlaceholder: '🔍 Rechercher par nom ou entity_id…',
     filterAll: 'Tous les risques',
     filterLow: '🟢 Faible',
@@ -4958,11 +4827,6 @@ const I18N = {
     softRestoreBtn: '♻️ Restaurer',
     softHardDelBtn: '❌ Supprimer définitivement',
     impactNote: '⚡ Analyse d\'impact:',
-    tokenSavedMsg: '✅ Token enregistré!',
-    tokenClearedMsg: '🗑️ Token effacé.',
-    tokenInvalidMsg: 'Token invalide. Veuillez créer un nouveau token dans Paramètres → Profil.',
-    tokenNoAuthMsg: 'Aucun token d\'authentification. Veuillez créer un token d\'accès longue durée dans Paramètres → Profil.',
-    tokenPromptMsg: '📱 Saisissez votre token d\'accès longue durée pour connecter HA.\nCe token sera stocké de façon permanente — à saisir une seule fois.\n\nCréation: Paramètres → Profil → défiler vers le bas\n"Tokens d\'accès longue durée" → Créer un token\n\nCollez votre token ici:',
     healthAnalyzingConn: 'Analyse de l\'historique des connexions...',
     healthDone: 'Analyse Health terminée !',
     cacheJustNow: 'à l\'instant',
@@ -5260,11 +5124,6 @@ const I18N = {
     btnCancel: '✕ Deselecteren',
     btnRestore: '♻️ Herstellen',
     btnHardDelete: '❌ Permanent verwijderen',
-    btnSaveToken: '💾 Token opslaan',
-    btnDeleteToken: '🗑️ Wissen',
-    tokenPlaceholder: 'Plak nieuw token hier…\nInstellingen → Profiel → Langlevende toegangstokens',
-    tokenNoToken: 'Geen token ingesteld',
-    tokenHint: 'Token opgeslagen in localStorage — slechts één keer invoeren.\nGebruik "Wissen" als token verloopt.',
     searchPlaceholder: '🔍 Zoeken op naam of entity_id…',
     filterAll: 'Alle risico\'s',
     filterLow: '🟢 Laag',
@@ -5354,11 +5213,6 @@ const I18N = {
     softRestoreBtn: '♻️ Herstellen',
     softHardDelBtn: '❌ Permanent verwijderen',
     impactNote: '⚡ Impact-analyse:',
-    tokenSavedMsg: '✅ Token opgeslagen!',
-    tokenClearedMsg: '🗑️ Token gewist.',
-    tokenInvalidMsg: 'Token ongeldig. Maak een nieuw token aan in Instellingen → Profiel.',
-    tokenNoAuthMsg: 'Geen authenticatietoken. Maak een token aan voor langdurige toegang in Instellingen → Profiel.',
-    tokenPromptMsg: '📱 Voer uw langlevend toegangstoken in om HA te verbinden.\nDit token wordt permanent opgeslagen — slechts één keer invoeren.\n\nAanmaken: Instellingen → Profiel → naar beneden scrollen\n"Langlevende toegangstokens" → Token aanmaken\n\nPlak uw token hier:',
 
     healthAnalyzingConn: 'Verbindingsgeschiedenis analyseren...',
     healthDone: 'Health-analyse voltooid!',
@@ -5657,11 +5511,6 @@ const I18N = {
     btnCancel: '✕ Odznacz',
     btnRestore: '♻️ Przywróć',
     btnHardDelete: '❌ Usuń trwale',
-    btnSaveToken: '💾 Zapisz token',
-    btnDeleteToken: '🗑️ Usuń',
-    tokenPlaceholder: 'Wklej nowy token tutaj…\nUstawienia → Profil → Tokeny długotrwałego dostępu',
-    tokenNoToken: 'Brak tokenu',
-    tokenHint: 'Token zapisany w localStorage — wystarczy wprowadzić raz.\nUżyj "Usuń" gdy token wygasa.',
     searchPlaceholder: '🔍 Szukaj po nazwie lub entity_id…',
     filterAll: 'Wszystkie ryzyka',
     filterLow: '🟢 Niskie',
@@ -5751,11 +5600,6 @@ const I18N = {
     softRestoreBtn: '♻️ Przywróć',
     softHardDelBtn: '❌ Usuń trwale',
     impactNote: '⚡ Analiza wpływu:',
-    tokenSavedMsg: '✅ Token zapisany!',
-    tokenClearedMsg: '🗑️ Token usunięty.',
-    tokenInvalidMsg: 'Token nieprawidłowy. Utwórz nowy token w Ustawienia → Profil.',
-    tokenNoAuthMsg: 'Brak tokenu uwierzytelniającego. Utwórz długotrwały token dostępu w Ustawienia → Profil.',
-    tokenPromptMsg: '📱 Wprowadź token długotrwałego dostępu aby połączyć z HA.\nToken będzie przechowywany na stałe — wystarczy wprowadzić raz.\n\nUtworzenie: Ustawienia → Profil → przewiń w dół\n"Tokeny długotrwałego dostępu" → Utwórz token\n\nWklej token tutaj:',
 
     healthAnalyzingConn: 'Analizowanie historii połączeń...',
     healthDone: 'Analiza Health zakończona!',
@@ -6054,11 +5898,6 @@ const I18N = {
     btnCancel: '✕ Avmarkera',
     btnRestore: '♻️ Återställ',
     btnHardDelete: '❌ Ta bort permanent',
-    btnSaveToken: '💾 Spara token',
-    btnDeleteToken: '🗑️ Rensa',
-    tokenPlaceholder: 'Klistra in ny token här…\nInställningar → Profil → Långlivade åtkomsttokens',
-    tokenNoToken: 'Ingen token angiven',
-    tokenHint: 'Token sparas i localStorage — ange bara en gång.\nAnvänd "Rensa" om token löper ut.',
     searchPlaceholder: '🔍 Sök på namn eller entity_id…',
     filterAll: 'Alla risker',
     filterLow: '🟢 Låg',
@@ -6148,11 +5987,6 @@ const I18N = {
     softRestoreBtn: '♻️ Återställ',
     softHardDelBtn: '❌ Ta bort permanent',
     impactNote: '⚡ Konsekvensanalys:',
-    tokenSavedMsg: '✅ Token sparad!',
-    tokenClearedMsg: '🗑️ Token rensad.',
-    tokenInvalidMsg: 'Token är ogiltig. Skapa en ny token i Inställningar → Profil.',
-    tokenNoAuthMsg: 'Ingen autentiseringstoken. Skapa en långlivad åtkomsttoken i Inställningar → Profil.',
-    tokenPromptMsg: '📱 Ange din långlivade åtkomsttoken för att ansluta till HA.\nToken lagras permanent — ange bara en gång.\n\nSkapa: Inställningar → Profil → scrolla ned\n"Långlivade åtkomsttokens" → Skapa token\n\nKlistra in token här:',
 
     healthAnalyzingConn: 'Analyserar anslutningshistorik...',
     healthDone: 'Health-analys klar!',
@@ -6451,11 +6285,6 @@ const I18N = {
     btnCancel: '✕ Kijelölés törlése',
     btnRestore: '♻️ Visszaállítás',
     btnHardDelete: '❌ Végleges törlés',
-    btnSaveToken: '💾 Token mentése',
-    btnDeleteToken: '🗑️ Törlés',
-    tokenPlaceholder: 'Token beillesztése ide…\nBeállítások → Profil → Hosszú életű hozzáférési tokenek',
-    tokenNoToken: 'Nincs token beállítva',
-    tokenHint: 'Token localStorage-ban tárolva — csak egyszer kell megadni.\nHasználja "Törlés"-t ha a token lejár.',
     searchPlaceholder: '🔍 Keresés névvel vagy entity_id-val…',
     filterAll: 'Minden kockázat',
     filterLow: '🟢 Alacsony',
@@ -6545,11 +6374,6 @@ const I18N = {
     softRestoreBtn: '♻️ Visszaállítás',
     softHardDelBtn: '❌ Végleges törlés',
     impactNote: '⚡ Hatáselemzés:',
-    tokenSavedMsg: '✅ Token mentve!',
-    tokenClearedMsg: '🗑️ Token törölve.',
-    tokenInvalidMsg: 'Token érvénytelen. Kérjük hozzon létre új tokent a Beállítások → Profil menüben.',
-    tokenNoAuthMsg: 'Nincs hitelesítési token. Hozzon létre hosszú életű hozzáférési tokent a Beállítások → Profil menüben.',
-    tokenPromptMsg: '📱 Adja meg a hosszú életű hozzáférési tokent a HA csatlakozáshoz.\nA token tartósan tárolásra kerül — csak egyszer kell megadni.\n\nLétrehozás: Beállítások → Profil → görgessen le\n"Hosszú életű hozzáférési tokenek" → Token létrehozása\n\nIllessze be a tokent ide:',
 
     healthAnalyzingConn: 'Kapcsolati előzmények elemzése...',
     healthDone: 'Health elemzés kész!',
@@ -6848,11 +6672,6 @@ const I18N = {
     btnCancel: '✕ Zrušit výběr',
     btnRestore: '♻️ Obnovit',
     btnHardDelete: '❌ Trvale smazat',
-    btnSaveToken: '💾 Uložit token',
-    btnDeleteToken: '🗑️ Smazat',
-    tokenPlaceholder: 'Vložte nový token zde…\nNastavení → Profil → Tokeny dlouhodobého přístupu',
-    tokenNoToken: 'Není nastaven žádný token',
-    tokenHint: 'Token je uložen v localStorage — stačí zadat jednou.\nPoužijte "Smazat" pokud token vyprší.',
     searchPlaceholder: '🔍 Hledat podle názvu nebo entity_id…',
     filterAll: 'Všechna rizika',
     filterLow: '🟢 Nízké',
@@ -6942,11 +6761,6 @@ const I18N = {
     softRestoreBtn: '♻️ Obnovit',
     softHardDelBtn: '❌ Trvale smazat',
     impactNote: '⚡ Analýza dopadu:',
-    tokenSavedMsg: '✅ Token uložen!',
-    tokenClearedMsg: '🗑️ Token smazán.',
-    tokenInvalidMsg: 'Token je neplatný. Vytvořte nový token v Nastavení → Profil.',
-    tokenNoAuthMsg: 'Žádný ověřovací token. Vytvořte token dlouhodobého přístupu v Nastavení → Profil.',
-    tokenPromptMsg: '📱 Zadejte svůj token dlouhodobého přístupu pro připojení k HA.\nToken bude uložen trvale — stačí zadat jednou.\n\nVytvoření: Nastavení → Profil → sjeďte dolů\n"Tokeny dlouhodobého přístupu" → Vytvořit token\n\nVložte token zde:',
 
     healthAnalyzingConn: 'Analyzování historie připojení...',
     healthDone: 'Analýza Health dokončena!',
@@ -7245,11 +7059,6 @@ const I18N = {
     btnCancel: '✕ Deseleziona',
     btnRestore: '♻️ Ripristina',
     btnHardDelete: '❌ Elimina definitivamente',
-    btnSaveToken: '💾 Salva token',
-    btnDeleteToken: '🗑️ Cancella',
-    tokenPlaceholder: 'Incolla nuovo token qui…\nImpostazioni → Profilo → Token di accesso a lunga durata',
-    tokenNoToken: 'Nessun token impostato',
-    tokenHint: 'Token salvato in localStorage — da inserire solo una volta.\nUsa "Cancella" se il token scade.',
     searchPlaceholder: '🔍 Cerca per nome o entity_id…',
     filterAll: 'Tutti i rischi',
     filterLow: '🟢 Basso',
@@ -7339,11 +7148,6 @@ const I18N = {
     softRestoreBtn: '♻️ Ripristina',
     softHardDelBtn: '❌ Elimina definitivamente',
     impactNote: '⚡ Analisi impatto:',
-    tokenSavedMsg: '✅ Token salvato!',
-    tokenClearedMsg: '🗑️ Token cancellato.',
-    tokenInvalidMsg: 'Token non valido. Crea un nuovo token in Impostazioni → Profilo.',
-    tokenNoAuthMsg: 'Nessun token di autenticazione. Crea un token di accesso a lunga durata in Impostazioni → Profilo.',
-    tokenPromptMsg: '📱 Inserisci il tuo token di accesso a lunga durata per connettere HA.\nIl token verrà memorizzato in modo permanente — inserirlo solo una volta.\n\nCreazione: Impostazioni → Profilo → scorri verso il basso\n"Token di accesso a lunga durata" → Crea token\n\nIncolla il token qui:',
 
     healthAnalyzingConn: 'Analisi della cronologia delle connessioni...',
     healthDone: 'Analisi Health completata!',
@@ -7681,11 +7485,6 @@ const I18N = {
     btnCancel: '✕ Desmarcar',
     btnRestore: '♻️ Restaurar',
     btnHardDelete: '❌ Excluir permanentemente',
-    btnSaveToken: '💾 Salvar token',
-    btnDeleteToken: '🗑️ Limpar',
-    tokenPlaceholder: 'Cole o novo token aqui…\nConfigurações → Perfil → Tokens de acesso de longa duração',
-    tokenNoToken: 'Nenhum token definido',
-    tokenHint: 'Token salvo no localStorage — inserir apenas uma vez.\nUse "Limpar" se o token expirar.',
     searchPlaceholder: '🔍 Pesquisar por nome ou entity_id…',
     filterAll: 'Todos os riscos',
     filterLow: '🟢 Baixo',
@@ -7775,11 +7574,6 @@ const I18N = {
     softRestoreBtn: '♻️ Restaurar',
     softHardDelBtn: '❌ Excluir permanentemente',
     impactNote: '⚡ Análise de impacto:',
-    tokenSavedMsg: '✅ Token salvo!',
-    tokenClearedMsg: '🗑️ Token limpo.',
-    tokenInvalidMsg: 'Token inválido. Crie um novo token em Configurações → Perfil.',
-    tokenNoAuthMsg: 'Nenhum token de autenticação. Crie um token de acesso de longa duração em Configurações → Perfil.',
-    tokenPromptMsg: '📱 Insira seu token de acesso de longa duração para conectar ao HA.\nO token será armazenado permanentemente — inserir apenas uma vez.\n\nCriação: Configurações → Perfil → role para baixo\n"Tokens de acesso de longa duração" → Criar token\n\nCole o token aqui:',
 
     healthAnalyzingConn: 'Analisando histórico de conexões...',
     healthDone: 'Análise de Health concluída!',
@@ -8039,11 +7833,6 @@ const I18N = {
     btnCancel: '✕ Počisti izbor',
     btnRestore: '♻️ Obnovi',
     btnHardDelete: '❌ Trajno izbriši',
-    btnSaveToken: '💾 Shrani žeton',
-    btnDeleteToken: '🗑️ Izbriši',
-    tokenPlaceholder: 'Prilepite novi žeton sem…\nNastavitve → Profil → Dolgoživečni dostopni žetoni',
-    tokenNoToken: 'Ni nastavljenega žetona',
-    tokenHint: 'Žeton je shranjen v localStorage — vnesite samo enkrat.\nUporabite "Izbriši" ko žeton poteče.',
     searchPlaceholder: '🔍 Iskanje po imenu ali entity_id…',
     filterAll: 'Vsa tveganja',
     filterLow: '🟢 Nizko',
@@ -8133,11 +7922,6 @@ const I18N = {
     softRestoreBtn: '♻️ Obnovi',
     softHardDelBtn: '❌ Trajno izbriši',
     impactNote: '⚡ Analiza vpliva:',
-    tokenSavedMsg: '✅ Žeton shranjen!',
-    tokenClearedMsg: '🗑️ Žeton izbrisan.',
-    tokenInvalidMsg: 'Žeton je neveljaven. Ustvarite nov žeton v Nastavitve → Profil.',
-    tokenNoAuthMsg: 'Ni žetona za preverjanje pristnosti. Ustvarite dolgoživečni dostopni žeton v Nastavitve → Profil.',
-    tokenPromptMsg: '📱 Vnesite dolgoživečni dostopni žeton za povezavo z HA.\nŽeton bo trajno shranjen — vnesite ga samo enkrat.\n\nUstvarjanje: Nastavitve → Profil → pomaknite se navzdol\n"Dolgoživečni dostopni žetoni" → Ustvari žeton\n\nSem prilepite žeton:',
 
     healthAnalyzingConn: 'Analiza zgodovine povezav...',
     healthDone: 'Analiza Health končana!',
@@ -8693,21 +8477,8 @@ function _applyTranslations() {
   const depSectionTitle = _el('depSectionTitle');
   if (depSectionTitle) depSectionTitle.innerHTML = `⚡ <span data-i18n="impactAnalysis">${t('impactAnalysis')}</span>`;
 
-  // ── Token UI
-  const tokenTA = _el('tokenInput');
-  if (tokenTA) tokenTA.placeholder = t('tokenPlaceholder');
-  const tokenDisplay = _el('tokenCurrentDisplay');
-  const tok = _loadToken();
-  if (tokenDisplay && !tok) tokenDisplay.textContent = t('tokenNoToken');
-  const tokenHintDiv = _el('tokenHintDiv');
-  if (tokenHintDiv) {
-    const hint = t('tokenHint');
-    // Preserve the <strong> formatting for the "1 time only" part
-    tokenHintDiv.innerHTML = hint.replace(/\n/g, '<br>');
-  }
-  // Token save/delete button spans
-  document.querySelectorAll('[data-i18n="btnSaveToken"]').forEach(el => el.textContent = t('btnSaveToken'));
-  document.querySelectorAll('[data-i18n="btnDeleteToken"]').forEach(el => el.textContent = t('btnDeleteToken'));
+  // ── Connection status text update
+  _updateConnStatus();
 
   // ── Backup notices
   const backupNotices = document.querySelectorAll('.backup-notice');
@@ -8842,10 +8613,18 @@ async function loadAddonTab() {
 
 // ── Addon action buttons ─────────────────────────────────────────
 async function _supervisorPost(path) {
-  const token = await getToken();
-  const hdr   = { 'Content-Type': 'application/json' };
-  if (token && token !== '__NO_TOKEN__') hdr['Authorization'] = `Bearer ${token}`;
-  const res  = await fetch(`/api/hassio${path}`, { method:'POST', headers:hdr });
+  // Try hass.callWS (Supervisor WebSocket API) first
+  const hass = _getHass();
+  if (hass?.callWS) {
+    try {
+      const result = await hass.callWS({ type: 'supervisor/api', endpoint: path, method: 'post' });
+      if (result?.result === 'ok' || result) return result?.data ?? result;
+    } catch(wsErr) {
+      console.warn('[HAOptimizer] callWS supervisor failed, trying REST:', wsErr);
+    }
+  }
+  // Fallback: direct REST (works in ingress / trusted)
+  const res = await fetch(`/api/hassio${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
   if (!res.ok) throw new Error(`Supervisor ${path}: HTTP ${res.status}`);
   const json = await res.json();
   if (json.result !== 'ok') throw new Error(json.message || 'Supervisor error');
