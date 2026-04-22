@@ -182,15 +182,17 @@
   .theme-dropdown-btn .arrow { font-size: 0.7rem; opacity: 0.7; transition: transform 0.2s; }
   .theme-dropdown-btn.open .arrow { transform: rotate(180deg); }
   .theme-dropdown-menu {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
+    position: fixed;
+    top: auto;
+    bottom: auto;
+    right: auto;
+    left: auto;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
     box-shadow: var(--shadow), 0 8px 32px rgba(0,0,0,0.4);
     padding: 8px;
-    z-index: 500;
+    z-index: 9998;
     min-width: 220px;
     display: none;
     flex-direction: column;
@@ -822,15 +824,17 @@
   .lang-dropdown-btn .arrow { font-size: 0.7rem; opacity: 0.7; transition: transform 0.2s; }
   .lang-dropdown-btn.open .arrow { transform: rotate(180deg); }
   .lang-dropdown-menu {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
+    position: fixed;
+    top: auto;
+    bottom: auto;
+    right: auto;
+    left: auto;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
     box-shadow: var(--shadow), 0 8px 32px rgba(0,0,0,0.4);
     padding: 8px;
-    z-index: 501;
+    z-index: 9999;
     min-width: 200px;
     display: none;
     flex-direction: column;
@@ -902,9 +906,6 @@
       <span id="themeCurrentName">Deep Space</span>
       <span class="arrow">▾</span>
     </button>
-    <div class="theme-dropdown-menu" id="themeDropdownMenu">
-      <!-- options injected by JS -->
-    </div>
   </div>
   <!-- LANGUAGE DROPDOWN -->
   <div class="lang-dropdown-wrap" id="langDropdownWrap">
@@ -913,9 +914,6 @@
       <span id="langCurrentName">Tiếng Việt</span>
       <span class="arrow">▾</span>
     </button>
-    <div class="lang-dropdown-menu" id="langDropdownMenu">
-      <!-- options injected by JS -->
-    </div>
   </div>
   <!-- DONATE BUTTON -->
   <a class="btn-donate" href="https://www.paypal.com/paypalme/doanlong1412" target="_blank" rel="noopener" id="btnDonate">
@@ -3515,6 +3513,16 @@ function toggleThemeMenu() {
   const btn  = document.getElementById('themeDropdownBtn');
   const isOpen = menu.classList.toggle('open');
   btn.classList.toggle('open', isOpen);
+  if (isOpen) {
+    const rect = btn.getBoundingClientRect();
+    const menuWidth = 240;
+    let left = rect.right - menuWidth;
+    if (left < 8) left = 8;
+    menu.style.left   = left + 'px';
+    menu.style.right  = 'auto';
+    menu.style.top    = (rect.bottom + 6) + 'px';
+    menu.style.bottom = 'auto';
+  }
 }
 
 // Close when clicking outside
@@ -8258,6 +8266,16 @@ function toggleLangMenu() {
   if (!menu) return;
   const isOpen = menu.classList.toggle('open');
   btn.classList.toggle('open', isOpen);
+  if (isOpen) {
+    const rect = btn.getBoundingClientRect();
+    const menuWidth = 220;
+    let left = rect.right - menuWidth;
+    if (left < 8) left = 8;
+    menu.style.left   = left + 'px';
+    menu.style.right  = 'auto';
+    menu.style.top    = (rect.bottom + 6) + 'px';
+    menu.style.bottom = 'auto';
+  }
 }
 
 // Close lang menu when clicking outside
@@ -8826,5 +8844,9 @@ document.addEventListener('DOMContentLoaded', () => {
   loadSavedLang();
 });
 </script>
+<!-- DROPDOWN MENUS — rendered at body level to escape any overflow clipping -->
+<div class="theme-dropdown-menu" id="themeDropdownMenu"></div>
+<div class="lang-dropdown-menu" id="langDropdownMenu"></div>
+
 </body>
 </html>
